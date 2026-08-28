@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String     @id @default(uuid())
+  googleId          String     @unique
+  email             String     @unique
+  name              String
+  avatar            String?
+  // Slack OAuth (per-user notification target). Null = not connected.
+  slackTeamId       String?
+  slackTeamName     String?
+  slackWebhookUrl   String?
+  slackChannel      String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  campaigns         Campaign[]
+}
+
+model Sender {
+  id                String     @id @default(uuid())
+  name              String
+  email             String     @unique
+  smtpHost          String
+  smtpPort          Int
+  smtpUser          String
+  smtpPass          String
+  maxEmailsPerHour  Int        @default(200)
+  createdAt         DateTime   @default(now())
+  emailJobs         EmailJob[]
+}
+
+model Campaign {
+  id            String     @id @default(uuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+  subject       String
+  body          String
+  startTime     DateTime
+  delaySeconds  Int
+  hourlyLimit   Int
+  recipientCount Int       @default(0)
+  createdAt     DateTime   @default(now())
+  emailJobs     EmailJob[]
+}
+
+enum EmailStatus {
+  SCHEDULED
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+}
+
+model EmailJob {
+  id            String      @id @default(uuid())
+  campaignId    String
+  campaign      Campaign    @relation(fields: [campaignId], references: [id])
+  senderId      String?
+  sender        Sender?     @relation(fields: [senderId], references: [id])
+  recipient     String
+  subject       String
+  body          String
+  scheduledFor  DateTime
+  status        EmailStatus @default(SCHEDULED)
+  bullJobId     String?     @unique
+  attempts      Int         @default(0)
+  sentAt        DateTime?
+  error         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([recipient])
+}
